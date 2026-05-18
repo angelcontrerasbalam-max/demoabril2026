@@ -16,7 +16,7 @@ st.set_page_config(
 @st.cache_data
 def load_data(file_path):
     try:
-        df = pd.read_excel'/datos/PATRONES FINAL.xlsx'
+        df = pd.read_excel('datos/PATRONES FINAL.xlsx')
         # Ensure 'Registro Patronal' is treated as string for consistent search
         if 'Registro Patronal' in df.columns:
             df['Registro Patronal'] = df['Registro Patronal'].astype(str)
@@ -26,7 +26,7 @@ def load_data(file_path):
         return pd.DataFrame()
 
 # --- IMPORTANT: Update this path if your Excel file is located elsewhere ---
-file_path = '/datos/PATRONES FINAL.xlsx'
+file_path = 'datos/PATRONES FINAL.xlsx'
 df = load_data(file_path)
 
 # --- Title ---
@@ -235,3 +235,4 @@ if not df.empty:
 
 else:
     st.error("No se pudo cargar el archivo de datos o está vacío. Por favor, verifica la ruta y el formato del archivo PATRONES.xlsx.")
+
