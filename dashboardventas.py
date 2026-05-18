@@ -22,7 +22,7 @@ def load_data(file_path):
         st.error(f"Error: The file '{file_path}' was not found. Please ensure it's in the correct directory.")
         return pd.DataFrame()
 
-file_path = '/DATOS/PATRONES FINAL'
+file_path = '/datos/PATRONES FINAL'
 df = load_data(file_path)
 
 # --- Title ---
