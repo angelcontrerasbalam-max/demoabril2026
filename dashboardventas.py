@@ -16,7 +16,7 @@ st.set_page_config(
 @st.cache_data
 def load_data(file_path):
     try:
-        df = pd.read_excel(file_path)
+        df = pd.read_excel'/datos/PATRONES FINAL.xlsx'
         # Ensure 'Registro Patronal' is treated as string for consistent search
         if 'Registro Patronal' in df.columns:
             df['Registro Patronal'] = df['Registro Patronal'].astype(str)
