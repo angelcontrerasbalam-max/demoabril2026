@@ -14,7 +14,7 @@ st.title("DEPARTAMENTO DE AFILIACIÓN Y VIGENCIA LA CEIBA IMSS")
 def load_data():
     # !!! IMPORTANTE: Asegúrate de que 'PATRONES.xlsx' esté en el mismo directorio
     # que tu aplicación Streamlit, o ajusta esta ruta de archivo para tu despliegue.
-    file_path = '(datos/PATRONES FINAL.xlsx')
+    file_path = 'datos/PATRONES FINAL.xlsx'
     try:
         df = pd.read_excel(file_path)
         
