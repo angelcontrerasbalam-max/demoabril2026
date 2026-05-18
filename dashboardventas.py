@@ -2,237 +2,207 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np # Often useful for numerical operations
 
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="AFILIACIÓN Y VIGENCIA YUCATÁN SUB DELEGACION 33 LA CEIBA",
-    page_icon="🏢",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# --- Configuración de la página de Streamlit ---
+st.set_page_config(layout="wide", page_title="DEPARTAMENTO DE AFILIACIÓN Y VIGENCIA LA CEIBA IMSS")
 
-# --- Load Data ---
+# --- Título principal de la aplicación ---
+st.title("DEPARTAMENTO DE AFILIACIÓN Y VIGENCIA LA CEIBA IMSS")
+
+# --- Carga de datos con caché para eficiencia ---
 @st.cache_data
-def load_data(file_path):
+def load_data():
+    # !!! IMPORTANTE: Asegúrate de que 'PATRONES.xlsx' esté en el mismo directorio
+    # que tu aplicación Streamlit, o ajusta esta ruta de archivo para tu despliegue.
+    file_path = '(datos/PATRONES FINAL.xlsx')
     try:
-        df = pd.read_excel('datos/PATRONES FINAL.xlsx')
-        # Ensure 'Registro Patronal' is treated as string for consistent search
-        if 'Registro Patronal' in df.columns:
-            df['Registro Patronal'] = df['Registro Patronal'].astype(str)
+        df = pd.read_excel(file_path)
+        
+        # Limpieza y preparación de datos
+        df.columns = df.columns.str.strip().str.replace(' ', '_').str.upper() # Limpiar nombres de columnas
+        df['FECHA_ULTIMO_MOV'] = pd.to_datetime(df['FECHA_ULTIMO_MOV'], errors='coerce')
+        
+        numeric_cols = ['TRABAJADORES', 'PRIMA_DE_RIESGO_ANTERIOR', 'PRIMA_DE_RIESGO_ACTUAL']
+        for col in numeric_cols:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+            
         return df
     except FileNotFoundError:
-        st.error(f"Error: The file '{file_path}' was not found. Please ensure it's in the correct directory.")
-        return pd.DataFrame()
+        st.error(f"Error: Archivo no encontrado en '{file_path}'. Por favor, asegúrese de que el archivo Excel esté en el mismo directorio que la aplicación Streamlit o ajuste la ruta del archivo.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error al cargar los datos: {e}")
+        st.stop()
 
-# --- IMPORTANT: Update this path if your Excel file is located elsewhere ---
-file_path = 'datos/PATRONES FINAL.xlsx'
-df = load_data(file_path)
+df = load_data()
 
-# --- Title ---
-st.title("🏢 AFILIACIÓN Y VIGENCIA YUCATÁN SUB DELEGACION 33 LA CEIBA 🏢")
-st.markdown("--- ")
+if df is not None:
+    # --- Barra de búsqueda para REGISTRO PATRONAL ---
+    st.header("Búsqueda de Patrones por Registro Patronal")
+    registro_patronal_input = st.text_input("Ingrese REGISTRO PATRONAL para buscar:", "")
 
-# --- Search Bar ---
-st.header("Buscador de Registros Patronales")
-search_registro = st.text_input("Ingresa el Registro Patronal para buscar:", "").strip()
-
-if not df.empty:
-    if search_registro:
-        filtered_df = df[df['Registro Patronal'].str.contains(search_registro, case=False, na=False)]
-        
+    if registro_patronal_input:
+        # Filtrar el DataFrame buscando el registro patronal (case-insensitive y permite búsqueda parcial)
+        filtered_df = df[df['REGISTRO_PATRONAL'].astype(str).str.contains(registro_patronal_input, case=False, na=False)]
         if not filtered_df.empty:
-            st.subheader(f"Resultados para Registro Patronal: {search_registro}")
-            st.write("**Información del Expediente:**")
+            st.dataframe(filtered_df)
+        else:
+            st.write("No se encontraron registros con ese REGISTRO PATRONAL.")
+    else:
+        st.write("Ingrese un REGISTRO PATRONAL para ver los detalles.")
+
+    # --- Sección de Análisis Gráfico ---
+    st.header("Análisis Gráfico de la Información")
+
+    # Uso de pestañas para organizar las visualizaciones como subpáginas
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+        "Canal de Trámite", "Delegaciones", "Actividad Económica",
+        "Número de Trabajadores", "Primas de Riesgo", "Tipo de Movimiento",
+        "Frecuencia por Fecha", "Medio vs Tipo de Movimiento"
+    ])
+
+    with tab1:
+        st.subheader("Canal de Trámite (Internet vs Ventanilla)")
+        if 'MEDIO' in df.columns:
+            medio_counts = df['MEDIO'].value_counts().reset_index()
+            medio_counts.columns = ['Medio', 'Cantidad']
+            fig1, ax1 = plt.subplots()
+            ax1.pie(medio_counts['Cantidad'], labels=medio_counts['Medio'], autopct='%1.1f%%', startangle=90, colors=sns.color_palette("pastel"))
+            ax1.axis('equal') # Asegura que el pastel se dibuje como un círculo
+            st.pyplot(fig1)
+            st.dataframe(medio_counts)
+        else:
+            st.write("Columna 'MEDIO' no encontrada para el análisis.")
+
+    with tab2:
+        st.subheader("Volumen de Trámites por Delegación")
+        if 'DELEGACION' in df.columns:
+            delegacion_counts = df['DELEGACION'].value_counts().sort_values(ascending=True)
+            fig2, ax2 = plt.subplots(figsize=(10, 6))
+            sns.barplot(x=delegacion_counts.values, y=delegacion_counts.index.astype(str), ax=ax2, palette="viridis") # Convert index to string for plotting
+            ax2.set_xlabel("Número de Trámites")
+            ax2.set_ylabel("Delegación")
+            st.pyplot(fig2)
+            st.dataframe(delegacion_counts.reset_index(name='Cantidad').rename(columns={'index': 'Delegación'}))
+        else:
+            st.write("Columna 'DELEGACION' no encontrada para el análisis.")
+
+    with tab3:
+        st.subheader("Actividad Económica y Movimientos")
+        if 'ACTIVIDAD' in df.columns:
+            actividad_counts = df['ACTIVIDAD'].value_counts(normalize=True).mul(100).round(2).reset_index()
+            actividad_counts.columns = ['Actividad', 'Porcentaje']
+            st.markdown("**Empresas por Actividad Económica (porcentaje de movimientos):**")
+            st.dataframe(actividad_counts.sort_values(by='Porcentaje', ascending=False))
+            fig3, ax3 = plt.subplots(figsize=(12, 7))
+            sns.barplot(x='Porcentaje', y='Actividad', data=actividad_counts.sort_values(by='Porcentaje', ascending=False), palette='magma')
+            ax3.set_xlabel("Porcentaje (%)")
+            ax3.set_ylabel("Actividad Económica")
+            st.pyplot(fig3)
+        else:
+            st.write("Columna 'ACTIVIDAD' no encontrada para el análisis.")
+
+    with tab4:
+        st.subheader("Relación entre Número de Trabajadores y Frecuencia de Trámites")
+        if 'TRABAJADORES' in df.columns and 'REGISTRO_PATRONAL' in df.columns:
+            movement_frequency = df['REGISTRO_PATRONAL'].value_counts().reset_index()
+            movement_frequency.columns = ['REGISTRO_PATRONAL', 'Frecuencia_Movimientos']
             
-            display_columns = [
-                'NOMBRE O RAZÓN SOCIAL',
-                'DOMICILIO',
-                'Ubicación Expediente' # Assuming this is the correct column name based on user request
-            ]
+            df_workers_freq = df.groupby('REGISTRO_PATRONAL')['TRABAJADORES'].mean().reset_index()
+            df_workers_freq = pd.merge(df_workers_freq, movement_frequency, on='REGISTRO_PATRONAL')
 
-            for col in display_columns:
-                if col in filtered_df.columns:
-                    st.write(f"**{col}:** {filtered_df.iloc[0][col]}")
+            fig4, ax4 = plt.subplots(figsize=(10, 6))
+            sns.scatterplot(x='TRABAJADORES', y='Frecuencia_Movimientos', data=df_workers_freq, ax=ax4)
+            ax4.set_xlabel("Número de Trabajadores")
+            ax4.set_ylabel("Frecuencia de Movimientos")
+            ax4.set_title("Número de Trabajadores vs. Frecuencia de Movimientos")
+            st.pyplot(fig4)
+            st.dataframe(df_workers_freq.sort_values(by='Frecuencia_Movimientos', ascending=False))
+        else:
+            st.write("Columnas 'TRABAJADORES' o 'REGISTRO_PATRONAL' no encontradas para el análisis.")
+
+    with tab5:
+        st.subheader("Comparación de Primas de Riesgo (Anterior vs Actual)")
+        if 'PRIMA_DE_RIESGO_ANTERIOR' in df.columns and 'PRIMA_DE_RIESGO_ACTUAL' in df.columns and 'REGISTRO_PATRONAL' in df.columns:
+            df['CAMBIO_PRIMA'] = df['PRIMA_DE_RIESGO_ACTUAL'] - df['PRIMA_DE_RIESGO_ANTERIOR']
+            
+            st.markdown("**Top 10 Patrones con mayor incremento en Prima de Riesgo:**")
+            st.dataframe(df.nlargest(10, 'CAMBIO_PRIMA')[['REGISTRO_PATRONAL', 'PRIMA_DE_RIESGO_ANTERIOR', 'PRIMA_DE_RIESGO_ACTUAL', 'CAMBIO_PRIMA']])
+
+            st.markdown("**Top 10 Patrones con mayor decremento en Prima de Riesgo:**")
+            st.dataframe(df.nsmallest(10, 'CAMBIO_PRIMA')[['REGISTRO_PATRONAL', 'PRIMA_DE_RIESGO_ANTERIOR', 'PRIMA_DE_RIESGO_ACTUAL', 'CAMBIO_PRIMA']])
+            
+            fig5, (ax5a, ax5b) = plt.subplots(1, 2, figsize=(14, 6))
+            sns.histplot(df['PRIMA_DE_RIESGO_ANTERIOR'].dropna(), kde=True, ax=ax5a, color='skyblue')
+            ax5a.set_title('Distribución Prima de Riesgo ANTERIOR')
+            ax5a.set_xlabel('Prima de Riesgo')
+            sns.histplot(df['PRIMA_DE_RIESGO_ACTUAL'].dropna(), kde=True, ax=ax5b, color='salmon')
+            ax5b.set_title('Distribución Prima de Riesgo ACTUAL')
+            ax5b.set_xlabel('Prima de Riesgo')
+            plt.tight_layout()
+            st.pyplot(fig5)
+            
+            fig5b, ax5c = plt.subplots(figsize=(10, 6))
+            sns.histplot(df['CAMBIO_PRIMA'].dropna(), kde=True, ax=ax5c, color='purple')
+            ax5c.set_title('Distribución del Cambio en Prima de Riesgo (Actual - Anterior)')
+            ax5c.set_xlabel('Cambio en Prima de Riesgo')
+            st.pyplot(fig5b)
+        else:
+            st.write("Columnas de Prima de Riesgo o 'REGISTRO_PATRONAL' no encontradas para el análisis.")
+
+    with tab6:
+        st.subheader("Tipos de Movimiento")
+        if 'ULTIMO_MOVIMIENTO' in df.columns:
+            movimiento_counts = df['ULTIMO_MOVIMIENTO'].value_counts().sort_values(ascending=True)
+            fig6, ax6 = plt.subplots(figsize=(10, 6))
+            sns.barplot(x=movimiento_counts.values, y=movimiento_counts.index, ax=ax6, palette="cubehelix")
+            ax6.set_xlabel("Cantidad")
+            ax6.set_ylabel("Tipo de Movimiento")
+            st.pyplot(fig6)
+            st.dataframe(movimiento_counts.reset_index(name='Cantidad').rename(columns={'index': 'Tipo de Movimiento'}))
+        else:
+            st.write("Columna 'ULTIMO_MOVIMIENTO' no encontrada para el análisis.")
+
+    with tab7:
+        st.subheader("Frecuencia de Últimos Movimientos por Fecha")
+        if 'FECHA_ULTIMO_MOV' in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df['FECHA_ULTIMO_MOV']):
+                daily_movements = df.groupby(df['FECHA_ULTIMO_MOV'].dt.date).size().reset_index(name='Conteo')
+                daily_movements.columns = ['Fecha', 'Conteo']
+                
+                if not daily_movements.empty:
+                    fig7, ax7 = plt.subplots(figsize=(12, 6))
+                    sns.lineplot(x='Fecha', y='Conteo', data=daily_movements, ax=ax7, marker='o')
+                    ax7.set_title("Frecuencia de Últimos Movimientos por Fecha")
+                    ax7.set_xlabel("Fecha")
+                    ax7.set_ylabel("Número de Movimientos")
+                    plt.xticks(rotation=45)
+                    plt.tight_layout()
+                    st.pyplot(fig7)
+                    st.dataframe(daily_movements.sort_values(by='Fecha'))
                 else:
-                    st.warning(f"Columna '{col}' no encontrada en el archivo Excel.")
-
-        else:
-            st.warning(f"No se encontraron resultados para el Registro Patronal '{search_registro}'.")
-    else:
-        st.info("Por favor, ingresa un Registro Patronal para buscar.")
-
-    st.markdown("--- ")
-
-    # --- Data Preprocessing for Visualizations ---
-    # Make sure these column names match your Excel file exactly
-    # You might need to adjust them based on your actual data
-
-    # Convert date columns to datetime objects
-    if 'Fecha Ultimo Movimiento' in df.columns:
-        df['Fecha Ultimo Movimiento'] = pd.to_datetime(df['Fecha Ultimo Movimiento'], errors='coerce')
-
-    # Convert numeric columns to numeric types
-    if 'Numero de Trabajadores' in df.columns:
-        df['Numero de Trabajadores'] = pd.to_numeric(df['Numero de Trabajadores'], errors='coerce')
-
-    if 'Prima Riesgo Anterior' in df.columns:
-        df['Prima Riesgo Anterior'] = pd.to_numeric(df['Prima Riesgo Anterior'], errors='coerce')
-    if 'Prima Riesgo Actual' in df.columns:
-        df['Prima Riesgo Actual'] = pd.to_numeric(df['Prima Riesgo Actual'], errors='coerce')
-
-
-    # --- Visualizations and Tables ---
-    st.header("Análisis y Visualizaciones")
-
-    # 1. Actividad económica: Tabla dinámica con porcentajes
-    st.subheader("📊 Actividad Económica - Distribución")
-    if 'Actividad Económica' in df.columns:
-        actividad_economica_counts = df['Actividad Económica'].value_counts(normalize=True).reset_index()
-        actividad_economica_counts.columns = ['Actividad Económica', 'Porcentaje']
-        actividad_economica_counts['Porcentaje'] = (actividad_economica_counts['Porcentaje'] * 100).round(2).astype(str) + '%'
-        st.dataframe(actividad_economica_counts, use_container_width=True)
-    else:
-        st.warning("Columna 'Actividad Económica' no encontrada para el análisis. Por favor, verifica el nombre de la columna.")
-
-    st.markdown("--- ")
-
-    # 2. Número de trabajadores: Gráfica de dispersión (scatter plot)
-    st.subheader("📈 Número de Trabajadores vs. Frecuencia de Trámites")
-    if 'Numero de Trabajadores' in df.columns and 'Registro Patronal' in df.columns:
-        tramite_frequency = df['Registro Patronal'].value_counts().reset_index()
-        tramite_frequency.columns = ['Registro Patronal', 'Frecuencia de Trámites']
-        
-        workers_and_frequency = df.groupby('Registro Patronal')['Numero de Trabajadores'].mean().reset_index()
-        workers_and_frequency = pd.merge(workers_and_frequency, tramite_frequency, on='Registro Patronal', how='left')
-        
-        workers_and_frequency.dropna(subset=['Numero de Trabajadores', 'Frecuencia de Trámites'], inplace=True)
-
-        if not workers_and_frequency.empty:
-            fig, ax = plt.subplots(figsize=(10, 6))
-            sns.scatterplot(
-                x='Numero de Trabajadores', 
-                y='Frecuencia de Trámites', 
-                data=workers_and_frequency,
-                hue='Frecuencia de Trámites', 
-                size='Numero de Trabajadores', 
-                sizes=(20, 400),
-                palette='viridis',
-                alpha=0.7,
-                ax=ax
-            )
-            ax.set_title('Número de Trabajadores vs. Frecuencia de Trámites')
-            ax.set_xlabel('Número de Trabajadores')
-            ax.set_ylabel('Frecuencia de Trámites (por Registro Patronal)')
-            st.pyplot(fig)
-        else:
-            st.info("No hay datos suficientes para generar la gráfica de dispersión de trabajadores y trámites.")
-    else:
-        st.warning("Columnas 'Numero de Trabajadores' o 'Registro Patronal' no encontradas para el análisis. Por favor, verifica los nombres de las columnas.")
-
-    st.markdown("--- ")
-
-    # 3. Primas de riesgo: Comparar prima anterior vs actual
-    st.subheader("📈 Comparación de Primas de Riesgo (Anterior vs Actual)")
-    if 'Prima Riesgo Anterior' in df.columns and 'Prima Riesgo Actual' in df.columns and 'Registro Patronal' in df.columns:
-        prima_data = df[['Registro Patronal', 'Prima Riesgo Anterior', 'Prima Riesgo Actual']].dropna()
-        
-        if not prima_data.empty:
-            if len(prima_data) > 50: 
-                sample_prima_data = prima_data.sample(n=50, random_state=42).reset_index(drop=True)
+                    st.write("No hay datos de fecha válidos para graficar.")
             else:
-                sample_prima_data = prima_data
-
-            prima_melted = sample_prima_data.melt(
-                id_vars='Registro Patronal',
-                value_vars=['Prima Riesgo Anterior', 'Prima Riesgo Actual'],
-                var_name='Tipo de Prima',
-                value_name='Valor de Prima'
-            )
-
-            fig, ax = plt.subplots(figsize=(12, 7))
-            sns.barplot(
-                x='Registro Patronal', 
-                y='Valor de Prima', 
-                hue='Tipo de Prima', 
-                data=prima_melted,
-                palette={'Prima Riesgo Anterior': 'skyblue', 'Prima Riesgo Actual': 'salmon'},
-                ax=ax
-            )
-            ax.set_title('Primas de Riesgo: Anterior vs Actual por Registro Patronal (Muestra)')
-            ax.set_xlabel('Registro Patronal')
-            ax.set_ylabel('Valor de Prima')
-            ax.tick_params(axis='x', rotation=45)
-            plt.tight_layout()
-            st.pyplot(fig)
+                st.write("La columna 'FECHA_ULTIMO_MOV' no es de tipo fecha. Por favor, revise el formato de los datos.")
         else:
-            st.info("No hay datos de primas de riesgo para comparar.")
-    else:
-        st.warning("Columnas 'Prima Riesgo Anterior', 'Prima Riesgo Actual' o 'Registro Patronal' no encontradas para el análisis. Por favor, verifica los nombres de las columnas.")
+            st.write("Columna 'FECHA_ULTIMO_MOV' no encontrada para el análisis.")
 
-    st.markdown("--- ")
+    with tab8:
+        st.subheader("Medio del Trámite vs Tipo de Movimiento")
+        if 'MEDIO' in df.columns and 'ULTIMO_MOVIMIENTO' in df.columns:
+            st.markdown("**Tabla Cruzada:**")
+            crosstab_medio_movimiento = pd.crosstab(df['MEDIO'], df['ULTIMO_MOVIMIENTO'])
+            st.dataframe(crosstab_medio_movimiento)
 
-    # 4. Tipo de movimiento: Gráfica de barras apiladas
-    st.subheader("📊 Tipos de Movimiento")
-    if 'Tipo de Movimiento' in df.columns:
-        movimiento_counts = df['Tipo de Movimiento'].value_counts().reset_index()
-        movimiento_counts.columns = ['Tipo de Movimiento', 'Conteo']
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.barplot(x='Tipo de Movimiento', y='Conteo', data=movimiento_counts, palette='pastel', ax=ax)
-        ax.set_title('Frecuencia de Tipos de Movimiento')
-        ax.set_xlabel('Tipo de Movimiento')
-        ax.set_ylabel('Número de Movimientos')
-        ax.tick_params(axis='x', rotation=45)
-        plt.tight_layout()
-        st.pyplot(fig)
-    else:
-        st.warning("Columna 'Tipo de Movimiento' no encontrada para el análisis. Por favor, verifica el nombre de la columna.")
-
-    st.markdown("--- ")
-
-    # 5. Último movimiento: Gráfica de líneas con eje temporal
-    st.subheader("📅 Frecuencia de Últimos Movimientos por Fecha")
-    if 'Fecha Ultimo Movimiento' in df.columns:
-        movements_by_date = df.dropna(subset=['Fecha Ultimo Movimiento'])
-        movements_by_date = movements_by_date.groupby(pd.Grouper(key='Fecha Ultimo Movimiento', freq='D')).size().reset_index(name='Conteo')
-
-        if not movements_by_date.empty:
-            fig, ax = plt.subplots(figsize=(12, 6))
-            sns.lineplot(x='Fecha Ultimo Movimiento', y='Conteo', data=movements_by_date, marker='o', color='green', ax=ax)
-            ax.set_title('Frecuencia Diaria de Últimos Movimientos')
-            ax.set_xlabel('Fecha')
-            ax.set_ylabel('Número de Movimientos')
-            ax.grid(True, linestyle='--', alpha=0.6)
+            st.markdown("**Gráfico de Barras Agrupadas:**")
+            fig8, ax8 = plt.subplots(figsize=(14, 7))
+            crosstab_medio_movimiento.plot(kind='bar', stacked=False, ax=ax8)
+            ax8.set_title("Medio del Trámite por Tipo de Movimiento")
+            ax8.set_xlabel("Medio del Trámite")
+            ax8.set_ylabel("Número de Movimientos")
+            plt.xticks(rotation=45, ha='right')
+            plt.legend(title="Tipo de Movimiento")
             plt.tight_layout()
-            st.pyplot(fig)
+            st.pyplot(fig8)
         else:
-            st.info("No hay datos de 'Fecha Ultimo Movimiento' válidos para graficar.")
-    else:
-        st.warning("Columna 'Fecha Ultimo Movimiento' no encontrada para el análisis. Por favor, verifica el nombre de la columna.")
-
-    st.markdown("--- ")
-
-    # 6. Canal de trámite: Gráfica de columnas o pastel
-    st.subheader("🌐 Canal de Trámite")
-    if 'Canal de Trámite' in df.columns:
-        canal_counts = df['Canal de Trámite'].value_counts().reset_index()
-        canal_counts.columns = ['Canal de Trámite', 'Conteo']
-
-        fig, ax = plt.subplots(figsize=(8, 8))
-        ax.pie(
-            canal_counts['Conteo'], 
-            labels=canal_counts['Canal de Trámite'], 
-            autopct='%1.1f%%', 
-            startangle=90, 
-            colors=sns.color_palette('viridis', len(canal_counts))
-        )
-        ax.set_title('Distribución de Canales de Trámite')
-        ax.axis('equal') 
-        st.pyplot(fig)
-    else:
-        st.warning("Columna 'Canal de Trámite' no encontrada para el análisis. Por favor, verifica el nombre de la columna.")
-
-else:
-    st.error("No se pudo cargar el archivo de datos o está vacío. Por favor, verifica la ruta y el formato del archivo PATRONES.xlsx.")
-
+            st.write("Columnas 'MEDIO' o 'ULTIMO_MOVIMIENTO' no encontradas para el análisis.")
