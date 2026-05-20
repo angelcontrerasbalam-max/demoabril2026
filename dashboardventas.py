@@ -55,7 +55,7 @@ def main():
     st.title("DEPARTAMENTO DE AFILIACIÓN Y VIGENCIA SUB DELEGACIÓN 33 LA CEIBA")
 
     # Load the data
-    file_path = 'datos/PATRONES PROYECTO FINAL.xlsx'
+    file_path = 'DATOS/PATRONES PROYECTO FINAL.xlsx'
     df = pd.read_excel(file_path)
 
     # --- Data Preprocessing ---
