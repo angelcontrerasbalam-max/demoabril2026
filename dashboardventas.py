@@ -814,7 +814,6 @@ with tab4:
             orientation='h',
             color='PRIMA DE RIESGO ACTUAL',
             color_continuous_scale=px.colors.sequential.OrRd,
-            color_continuous_scale=[[0, '#F97316'], [0.5, '#DC2626'], [1, '#7F0000']],
             range_color=[min_val_s, max_val],
             labels={'PRIMA DE RIESGO ACTUAL': 'Prima Promedio (%)', 'ACTIVIDAD': 'Sector Económico'},
             text=avg_prima_sector['PRIMA DE RIESGO ACTUAL'].apply(lambda x: f"{x:.2f}%"),
